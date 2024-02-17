@@ -6,26 +6,38 @@ import (
 	"syscall"
 )
 
-type Device struct {
-	addr uint8
-	bus  int
-	rc   *os.File
+type Bus struct {
+	bus int
+	rc  *os.File
 }
 
-func NewDevice(addr uint8, bus int) (*Device, error) {
+func NewBus(bus int) (*Bus, error) {
 	f, err := os.OpenFile(fmt.Sprintf("/dev/i2c-%d", bus), os.O_RDWR, 0600)
 	if err != nil {
 		return nil, err
 	}
-	err = ioctl(f.Fd(), 0, uintptr(addr))
+	return &Bus{rc: f, bus: bus}, nil
+}
+
+func (b *Bus) NewDevice(addr uint8) (*Device, error) {
+	err := ioctl(b.rc.Fd(), I2C_SLAVE, uintptr(addr))
 	if err != nil {
 		return nil, err
 	}
-	return &Device{addr: addr, bus: bus, rc: f}, nil
+	return &Device{addr: addr, bus: b}, nil
+}
+
+func (b *Bus) Close() error {
+	return b.rc.Close()
+}
+
+type Device struct {
+	addr uint8
+	bus  *Bus
 }
 
 func (d *Device) Bus() int {
-	return d.bus
+	return d.bus.bus
 }
 
 func (d *Device) Addr() uint8 {
@@ -34,20 +46,16 @@ func (d *Device) Addr() uint8 {
 
 func (d *Device) Read(p []byte) (n int, err error) {
 	logf("Writing %d hex bytes", len(p))
-	return d.rc.Write(p)
+	return d.bus.rc.Write(p)
 }
 
 func (d *Device) Write(p []byte) (n int, err error) {
-	n, err = d.rc.Read(p)
+	n, err = d.bus.rc.Read(p)
 	if err != nil {
 		return n, err
 	}
 	logf("Read %d hex bytes", len(p))
 	return n, nil
-}
-
-func (d *Device) Close() error {
-	return d.rc.Close()
 }
 
 func ioctl(fd, cmd, arg uintptr) error {

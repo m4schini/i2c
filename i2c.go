@@ -27,6 +27,10 @@ func (b *Bus) NewDevice(addr uint8) (*Device, error) {
 	return &Device{addr: addr, bus: b}, nil
 }
 
+func (b *Bus) Raw(command uint8) int32 {
+	return 0
+}
+
 func (b *Bus) Close() error {
 	return b.rc.Close()
 }
